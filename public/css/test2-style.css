@@ -1,0 +1,90 @@
+
+body{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background-color: rgb(24, 106, 106);
+}
+
+
+.input-container {
+    position: relative;
+    /* width: 100%; */
+    height: auto;
+    border-radius: 3rem;
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    justify-content: center;
+    margin: 0.5rem;
+    background: #1f1f1f;
+}
+
+
+.input-container .input-field {
+    position: relative;
+    max-height: 4.2rem;
+    padding: 1rem 2rem;
+    padding-left: 5rem !important;
+    border: 0.15rem solid rgb(68, 68, 68);
+    color: #d2d2d2;
+    outline: none;
+    border-radius: 3rem;
+    font-size: 1.3rem;
+    font-weight: 400;
+    width: 100%;
+    background: transparent;
+    transition: border-color 0.3s ease;
+    cursor: pointer;
+}
+
+.input-container::before {
+    position: absolute;
+    content: "";
+    height: 30%;
+    width: 0.12rem;
+    left: 16%;
+    border-radius: 0.5rem;
+    background: #707070;
+}
+
+
+.input-container label {
+    position: absolute;
+    top: 50%;
+    left: 20%;
+    transform: translateY(-50%);
+    font-size: 0.9rem;
+    transition: 0.3s ease-in-out;
+    font-weight: 500;
+    color: #999999;
+    padding: 0 0.3rem;
+    user-select: none;
+}
+
+
+.input-field:focus + label {
+    top: 0%;
+    left: 10%;
+    border-radius: 3rem;
+    background: #252020;
+    color: #d2d2d2;
+}
+
+.input-field:focus {
+    border-color: #96c477;
+}
+
+
+.input-field:not(:placeholder-shown):not(:focus) + label {
+    top: 0%;
+    left: 10%;
+    border-radius: 3rem;
+    background-color: #1f1f1f;
+    color: #d2d2d2;
+}
+
+.input-field:not(:placeholder-shown):not(:focus) {
+    border-color: #96c477;
+}

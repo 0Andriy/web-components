@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My First Webpage</title>
+    <link rel="stylesheet" href="../css/reset.css" />
+    <link rel="stylesheet" href="../css/test1-style.css" />
+  </head>
+
+  <body>
+    <form class="form">
+      <!-- input container -->
+      <div class="input-container">
+        <!-- input -->
+        <input
+          type="email"
+          name=""
+          placeholder=" "
+          class="input-field"
+          id="email-input"
+          autocomplete="off"
+          required
+        />
+        <!-- input label - which will animate while focus on input -->
+        <label for="email-input">Email Address</label>
+        <!-- email icon - font-awesome -->
+        <i id="email-icon" class="fa-regulat fa-envelope"></i>
+        <!-- email invalid toast message -->
+        <span class="toast-msg" id="invalid-toast">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <p>Please enter the correct emeil format!</p>
+        </span>
+
+        <!-- email success submit message -->
+        <span class="toast-msg success" id="success-toast">
+          <i class="fa-solid fa-check"></i>
+          <p>Great! Your email successfuly submitted.</p>
+        </span>
+      </div>
+      <!-- <button class="submit-btn">submit</button> -->
+    </form>
+  </body>
+</html>
