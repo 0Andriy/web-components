@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Написи -->
+    <title>Document</title>
+
+    <!-- Підключаємо стилі -->
+    <link rel="stylesheet" href="reset.css">
+    <link rel="stylesheet" href="../css/toggle-style.css">
+    <link rel="stylesheet" href="../css/dropdown-style.css">
+
+    <!-- Підключення js (defer - атрибут, який вказує браузеру відкласти виконання JavaScript до завершення завантаження HTML-документа. Це корисно для забезпечення того, що DOM повністю завантажено перед виконанням скриптів.) -->
+    <script src="script.js" defer></script>
+
+</head>
+<body>
+    <!-- Створюємо Switch -->
+    <div class="container-switch">
+        <div class="toggle-container">
+            <span class="toggle-label">Enable Notifications</span>
+            <label class="switch">
+                <input type="checkbox" id="toggleMode">
+                <div class="slider">
+                    <div class="circle"></div>
+                </div>
+            </label>
+        </div>
+    </div>
+
+
+    <!-- Dropdown list -->
+    <div class="dropdown-container">
+        <button class="dropdown-btn">Show List</button>
+        <div class="dropdown-content">
+            <ul>
+                <li>Item 1</li>
+                <li>Item 2</li>
+                <li>Item 3</li>
+                <li>Item 4</li>
+                <li>Item 5</li>
+                <li>Item 6</li>
+                <li>Item 7</li>
+                <li>Item 8</li>
+                <li>Item 9</li>
+                <li>Item 10</li>
+                <!-- Add more items as needed -->
+            </ul>
+        </div>
+    </div>
+    
+    
+</body>
+</html>
