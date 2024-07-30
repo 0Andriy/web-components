@@ -27,7 +27,7 @@ class FileHasher {
             this.logger.log(`${message}`);
         }
     }
-
+    
     /**
      * Асинхронне хешування файлу.
      * @param {string} filePath - Шлях до файлу.
@@ -221,7 +221,7 @@ class FileHasher {
 
 
 
-// Приклад використання
+// Тестування класу FileHasher
 (async () => {
     const hasher = new FileHasher('sha256', false, console);
 
@@ -243,11 +243,17 @@ class FileHasher {
 
         const recursiveInfosNoDirHash = await hasher.hashDirectoryRecursively('D:\\Users\\MuliarAV\\Desktop\\test_hash', false);
         console.log('Recursive folder infos without directory hashes:', recursiveInfosNoDirHash);
-        
+
 
     } catch (error) {
         console.error('Error:', error.message);
     }
 })
 
-();
+// Запуск тестів
+// ()
+
+
+
+module.exports = FileHasher
+
