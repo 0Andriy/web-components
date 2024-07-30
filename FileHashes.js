@@ -2,14 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+
 class FileHasher {
     /**
      * Конструктор класу FileHasher.
      * @param {string} algorithm - Алгоритм хешування (за замовчуванням 'sha256').
-     * @param {boolean} enableLogging - Чи ввімкнути логування (за замовчуванням true).
+     * @param {boolean} enableLogging - Чи ввімкнути логування (за замовчуванням false).
      * @param {object} logger - Логгер для виведення повідомлень (за замовчуванням console).
      */
-    constructor(algorithm = 'sha256', enableLogging = true, logger = console) {
+    constructor(algorithm = 'sha256', enableLogging = false, logger = console) {
         this.algorithm = algorithm;
         this.enableLogging = enableLogging;
         this.logger = logger;
@@ -23,7 +24,7 @@ class FileHasher {
      */
     log(message) {
         if (this.enableLogging) {
-            this.logger.log(message);
+            this.logger.log(`${message}`);
         }
     }
 
@@ -99,7 +100,7 @@ class FileHasher {
     /**
      * Хешування директорії на основі її вмісту.
      * @param {string} dirPath - Шлях до директорії.
-     * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій.
+     * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій. (за замовчуванням false)
      * @returns {Promise<Object>} - Об'єкт з хешем директорії та інформацією про її вміст.
      */
     async hashDirectory(dirPath, includeDirectories = false) {
@@ -156,8 +157,8 @@ class FileHasher {
     /**
      * Асинхронне рекурсивне читання директорії з можливістю включення хешів для піддиректорій.
      * @param {string} currentPath - Поточний шлях директорії.
-     * @param {string} relativePath - Відносний шлях директорії.
-     * @param {boolean} includeDirectories - Включати чи ні хеші для директорій.
+     * @param {string} relativePath - Відносний шлях директорії. (за замовчуванням "")
+     * @param {boolean} includeDirectories - Включати чи ні хеші для директорій. (за замовчуванням false)
      * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли та директорії.
      */
     async readDirectory(currentPath, relativePath = '', includeDirectories = false) {
@@ -204,7 +205,7 @@ class FileHasher {
     /**
      * Асинхронне рекурсивне хешування директорії з опцією включення хешів для піддиректорій.
      * @param {string} dirPath - Шлях до директорії.
-     * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій.
+     * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій. (за замовчуванням false)
      * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли та директорії.
      */
     async hashDirectoryRecursively(dirPath, includeDirectories = false) {
@@ -218,30 +219,35 @@ class FileHasher {
     }
 }
 
+
+
 // Приклад використання
 (async () => {
-    const hasher = new FileHasher('sha256', true, console);
+    const hasher = new FileHasher('sha256', false, console);
 
     try {
-        const fileHash = await hasher.hashFile('project/folder/file1.txt');
+        const fileHash = await hasher.hashFile('D:\\Users\\MuliarAV\\Desktop\\test_hash\\pictures\\test2.jpg');
         console.log('File hash:', fileHash);
 
-        const folderInfos = await hasher.hashFilesInDirectory('project/folder');
+        const folderInfos = await hasher.hashFilesInDirectory('D:\\Users\\MuliarAV\\Desktop\\test_hash\\pictures');
         console.log('Folder file infos:', folderInfos);
 
-        const recursiveInfos = await hasher.hashDirectoryRecursively('project/folder', true);
-        console.log('Recursive folder infos with directory hashes:', recursiveInfos);
-
-        const recursiveInfosNoDirHash = await hasher.hashDirectoryRecursively('project/folder', false);
-        console.log('Recursive folder infos without directory hashes:', recursiveInfosNoDirHash);
-
-        const directoryInfoWithHashes = await hasher.hashDirectory('project/folder', true);
+        const directoryInfoWithHashes = await hasher.hashDirectory('D:\\Users\\MuliarAV\\Desktop\\test_hash\\pictures', true);
         console.log('Directory hash and contents with directory hashes:', directoryInfoWithHashes);
 
-        const directoryInfoWithoutHashes = await hasher.hashDirectory('project/folder', false);
+        const directoryInfoWithoutHashes = await hasher.hashDirectory('D:\\Users\\MuliarAV\\Desktop\\test_hash', false);
         console.log('Directory hash and contents without directory hashes:', directoryInfoWithoutHashes);
+
+        const recursiveInfos = await hasher.hashDirectoryRecursively('D:\\Users\\MuliarAV\\Desktop\\test_hash', true);
+        console.log('Recursive folder infos with directory hashes:', recursiveInfos);
+
+        const recursiveInfosNoDirHash = await hasher.hashDirectoryRecursively('D:\\Users\\MuliarAV\\Desktop\\test_hash', false);
+        console.log('Recursive folder infos without directory hashes:', recursiveInfosNoDirHash);
+        
 
     } catch (error) {
         console.error('Error:', error.message);
     }
-})();
+})
+
+();
