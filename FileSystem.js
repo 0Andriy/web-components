@@ -15,10 +15,10 @@ class FileSystem {
    * @param {boolean} enableLogging - Увімкнення або вимкнення логування.
    */
   constructor(basePath, enableLogging = false) {
-    this.basePath = basePath;
+    this.basePath = basePath; // Основний шлях для всіх операцій з файлами
     this.memoryStorage = new Map(); // Сховище для тимчасових даних в пам'яті
     this.maxMemorySize = 1024 * 1024 * 100; // Максимальний розмір кешу в байтах (100MB)
-    this.enableLogging = enableLogging;
+    this.enableLogging = enableLogging; // Увімкнення або вимкнення логування
   }
 
   /**
@@ -27,212 +27,235 @@ class FileSystem {
    */
   log(message) {
     if (this.enableLogging) {
-      console.log(message);
+      console.log(message); // Виводить повідомлення в консоль
     }
   }
 
   /**
    * Перевіряє, чи існує директорія, і створює її, якщо не існує (асинхронний варіант).
-   * @param {string} dirPath - Відносний шлях до директорії.
+   * @param {string} dirPath - Відносний або абсолютний шлях до директорії.
    * @returns {Promise<void>}
    */
   async ensureDirectoryExists(dirPath) {
     try {
-      await fsPromises.mkdir(dirPath, { recursive: true });
-      this.log(`Directory ensured: ${dirPath}`);
+      const fullPath = this.resolvePath(dirPath); // Перетворює відносний шлях у абсолютний
+      await fsPromises.mkdir(fullPath, { recursive: true }); // Створює директорію, включаючи проміжні
+      this.log(`Directory ensured: ${fullPath}`); // Логування успішного створення директорії
     } catch (error) {
-      console.error(`Error ensuring directory exists ${dirPath}: ${error.message}`);
-      throw error;
+      console.error(`Error ensuring directory exists ${dirPath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
   /**
    * Перевіряє, чи існує директорія, і створює її, якщо не існує (синхронний варіант).
-   * @param {string} dirPath - Відносний шлях до директорії.
+   * @param {string} dirPath - Відносний або абсолютний шлях до директорії.
    */
   ensureDirectoryExistsSync(dirPath) {
     try {
-      fs.mkdirSync(dirPath, { recursive: true });
-      this.log(`Directory ensured: ${dirPath}`);
+      const fullPath = this.resolvePath(dirPath); // Перетворює відносний шлях у абсолютний
+      fs.mkdirSync(fullPath, { recursive: true }); // Створює директорію, включаючи проміжні
+      this.log(`Directory ensured: ${fullPath}`); // Логування успішного створення директорії
     } catch (error) {
-      console.error(`Error ensuring directory exists ${dirPath}: ${error.message}`);
-      throw error;
+      console.error(`Error ensuring directory exists ${dirPath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
   /**
    * Перевіряє, чи файл заблокований або недоступний для запису (асинхронний варіант).
-   * @param {string} filePath - Відносний шлях до файлу.
+   * @param {string} filePath - Відносний або абсолютний шлях до файлу.
    * @returns {Promise<boolean>}
    */
   async isFileLocked(filePath) {
     try {
-      const fullPath = path.join(this.basePath, filePath);
-      await fsPromises.access(fullPath, fs.constants.W_OK);
-      this.log(`File is not locked: ${filePath}`);
+      const fullPath = this.resolvePath(filePath); // Перетворює відносний шлях у абсолютний
+      await fsPromises.access(fullPath, fs.constants.W_OK); // Перевіряє доступність файлу для запису
+      this.log(`File is not locked: ${fullPath}`); // Логування, якщо файл не заблокований
       return false; // Файл не заблокований
     } catch (error) {
       if (error.code === 'EACCES') {
-        this.log(`File is locked: ${filePath}`);
+        this.log(`File is locked: ${fullPath}`); // Логування, якщо файл заблокований
         return true; // Файл заблокований або недоступний
       }
-      throw error; // Перевидаємо помилку, якщо це не помилка дозволу
+      throw error; // Перекидання помилки, якщо це не помилка дозволу
     }
   }
 
   /**
    * Додає дані до файлу без перезапису (асинхронний варіант).
-   * @param {string} filePath - Відносний шлях до файлу.
+   * @param {string} filePath - Відносний або абсолютний шлях до файлу.
    * @param {string | Buffer} data - Дані для додавання.
    * @param {string} [encoding='utf8'] - Кодування файлу.
    */
   async appendFile(filePath, data, encoding = 'utf8') {
     try {
-      const fullPath = path.join(this.basePath, filePath);
-      await this.ensureDirectoryExists(path.dirname(filePath));
-      await fsPromises.appendFile(fullPath, data, encoding);
-      this.log(`Appended to file: ${filePath}`);
+      const fullPath = this.resolvePath(filePath); // Перетворює відносний шлях у абсолютний
+      await this.ensureDirectoryExists(path.dirname(fullPath)); // Переконується, що директорія існує
+      await fsPromises.appendFile(fullPath, data, encoding); // Додає дані до файлу
+      this.log(`Appended to file: ${fullPath}`); // Логування успішного додавання
     } catch (error) {
-      console.error(`Error appending to file ${filePath}: ${error.message}`);
-      throw error;
+      console.error(`Error appending to file ${filePath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
   /**
    * Створює потік для читання файлу.
-   * @param {string} filePath - Відносний шлях до файлу.
+   * @param {string} filePath - Відносний або абсолютний шлях до файлу.
    * @param {object} [options] - Опції для створення потоку.
    * @returns {Readable}
    */
   createReadStream(filePath, options) {
     try {
-      const fullPath = path.join(this.basePath, filePath);
-      this.log(`Creating read stream for file: ${filePath}`);
-      return createReadStream(fullPath, options);
+      const fullPath = this.resolvePath(filePath); // Перетворює відносний шлях у абсолютний
+      this.log(`Creating read stream for file: ${fullPath}`); // Логування створення потоку
+      return createReadStream(fullPath, options); // Повертає потік для читання
     } catch (error) {
-      console.error(`Error creating read stream for file ${filePath}: ${error.message}`);
-      throw error;
+      console.error(`Error creating read stream for file ${filePath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
   /**
    * Створює потік для запису файлу.
-   * @param {string} filePath - Відносний шлях до файлу.
+   * @param {string} filePath - Відносний або абсолютний шлях до файлу.
    * @param {object} [options] - Опції для створення потоку.
    * @returns {Writable}
    */
   createWriteStream(filePath, options) {
     try {
-      const dirPath = path.dirname(filePath);
-      this.ensureDirectoryExistsSync(dirPath);
-      const fullPath = path.join(this.basePath, filePath);
-      this.log(`Creating write stream for file: ${filePath}`);
-      return createWriteStream(fullPath, options);
+      const fullPath = this.resolvePath(filePath); // Перетворює відносний шлях у абсолютний
+      const dirPath = path.dirname(fullPath); // Отримує директорію для створення
+      this.ensureDirectoryExistsSync(dirPath); // Переконується, що директорія існує
+      this.log(`Creating write stream for file: ${fullPath}`); // Логування створення потоку
+      return createWriteStream(fullPath, options); // Повертає потік для запису
     } catch (error) {
-      console.error(`Error creating write stream for file ${filePath}: ${error.message}`);
-      throw error;
+      console.error(`Error creating write stream for file ${filePath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
   /**
    * Зберігає великі масиви JSON даних у файл з використанням потоків.
    * Записує дані частинами для обробки великих обсягів даних.
-   * @param {string} filePath - Відносний шлях до файлу.
+   * @param {string} filePath - Відносний або абсолютний шлях до файлу.
    * @param {Array} dataArray - Масив даних для збереження.
    * @returns {Promise<void>}
    */
   async saveLargeJson(filePath, dataArray) {
     try {
-      const writableStream = this.createWriteStream(filePath, { flags: 'w' });
-      writableStream.write('[');
-      this.log(`Started saving large JSON data to file: ${filePath}`);
+      const fullPath = this.resolvePath(filePath); // Перетворює відносний шлях у абсолютний
+      const writableStream = this.createWriteStream(fullPath, { flags: 'w' }); // Створює потік для запису
+      writableStream.write('['); // Пише початок JSON масиву
+      this.log(`Started saving large JSON data to file: ${fullPath}`); // Логування початку збереження
 
       for (let i = 0; i < dataArray.length; i++) {
-        if (i > 0) writableStream.write(',');
-        const jsonChunk = JSON.stringify(dataArray[i]);
-        writableStream.write(jsonChunk);
+        if (i > 0) writableStream.write(','); // Додає коми між елементами масиву
+        const jsonChunk = JSON.stringify(dataArray[i]); // Конвертує дані в JSON формат
+        writableStream.write(jsonChunk); // Записує JSON в файл
         if (i % 5 === 0) {
           // Введення невеликої затримки для уникнення перевантаження системи
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise(resolve => setImmediate(resolve));
         }
       }
 
-      writableStream.write(']');
-      writableStream.end();
+      writableStream.write(']'); // Пише кінець JSON масиву
+      writableStream.end(); // Завершує запис
+      this.log(`Completed saving large JSON data to file: ${fullPath}`); // Логування завершення збереження
+    } catch (error) {
+      console.error(`Error saving large JSON data to file ${filePath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
+    }
+  }
 
-      // Повертає проміс, що вирішується, коли потік закінчує запис
-      return new Promise((resolve, reject) => {
-        writableStream.on('finish', () => {
-          this.log(`Finished saving large JSON data to file: ${filePath}`);
-          resolve();
-        });
-        writableStream.on('error', reject);
+  /**
+   * Завантажує великий JSON файл частинами для обробки даних.
+   * @param {string} filePath - Відносний або абсолютний шлях до файлу.
+   * @param {Function} processChunk - Функція для обробки кожного шматка даних.
+   * @returns {Promise<void>}
+   */
+  async processLargeJson(filePath, processChunk) {
+    try {
+      const fullPath = this.resolvePath(filePath); // Перетворює відносний шлях у абсолютний
+      const readStream = this.createReadStream(fullPath); // Створює потік для читання
+      let jsonString = ''; // Змінна для зберігання JSON рядка
+
+      readStream.on('data', chunk => {
+        jsonString += chunk; // Накопичує частини JSON рядка
+      });
+
+      readStream.on('end', async () => {
+        try {
+          const jsonData = JSON.parse(jsonString); // Конвертує JSON рядок в об'єкт
+          await processChunk(jsonData); // Обробляє отримані дані
+        } catch (error) {
+          console.error(`Error processing JSON data from file ${filePath}: ${error.message}`); // Логування помилки
+          throw error; // Перекидання помилки
+        }
+      });
+
+      readStream.on('error', error => {
+        console.error(`Error reading file ${filePath}: ${error.message}`); // Логування помилки читання
+        throw error; // Перекидання помилки
       });
     } catch (error) {
-      console.error(`Error saving large JSON data to ${filePath}: ${error.message}`);
-      throw error;
+      console.error(`Error processing large JSON file ${filePath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
   /**
-   * Зберігає великі масиви JSON даних у пам'яті.
-   * Розділяє дані на частини, щоб уникнути переповнення пам'яті.
-   * @param {string} key - Ключ для зберігання даних у пам'яті.
-   * @param {Array} dataArray - Масив даних для збереження.
-   */
-  saveLargeJsonInMemory(key, dataArray) {
-    try {
-      const jsonSize = Buffer.byteLength(JSON.stringify(dataArray));
-      if (jsonSize > this.maxMemorySize) {
-        throw new Error('Data size exceeds memory limit');
-      }
-
-      // Очистка пам'яті перед збереженням нових даних
-      if (this.memoryStorage.size >= 5) {
-        const firstKey = this.memoryStorage.keys().next().value;
-        this.memoryStorage.delete(firstKey);
-      }
-
-      this.memoryStorage.set(key, dataArray);
-      this.log(`Saved large JSON data to memory under key: ${key}`);
-    } catch (error) {
-      console.error(`Error saving JSON data to memory: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Отримує дані з пам'яті.
+   * Зберігає дані в пам'яті для подальшого використання.
    * @param {string} key - Ключ для доступу до даних у пам'яті.
-   * @returns {Array}
+   * @param {Array} data - Дані для збереження.
+   * @returns {Promise<void>}
+   */
+  async saveToMemory(key, data) {
+    try {
+      if (this.memoryStorage.size >= this.maxMemorySize) {
+        throw new Error('Memory cache limit reached. Consider clearing some data.'); // Перевірка переповнення кешу
+      }
+      this.memoryStorage.set(key, data); // Зберігає дані в пам'яті
+      this.log(`Saved JSON data to memory with key: ${key}`); // Логування успішного збереження
+    } catch (error) {
+      console.error(`Error saving JSON data to memory: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
+    }
+  }
+
+  /**
+   * Завантажує дані з пам'яті за вказаним ключем.
+   * @param {string} key - Ключ для доступу до даних у пам'яті.
+   * @returns {Array} - Завантажені дані.
    */
   getJsonFromMemory(key) {
     try {
       if (!this.memoryStorage.has(key)) {
-        throw new Error(`No data found in memory with key: ${key}`);
+        throw new Error(`No data found in memory with key: ${key}`); // Перевірка наявності даних
       }
-      this.log(`Retrieved JSON data from memory with key: ${key}`);
-      return this.memoryStorage.get(key);
+      this.log(`Retrieved JSON data from memory with key: ${key}`); // Логування успішного отримання
+      return this.memoryStorage.get(key); // Повертає дані з пам'яті
     } catch (error) {
-      console.error(`Error retrieving JSON data from memory: ${error.message}`);
-      throw error;
+      console.error(`Error retrieving JSON data from memory: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
   /**
-   * Видаляє дані з пам'яті.
+   * Видаляє дані з пам'яті за вказаним ключем.
    * @param {string} key - Ключ для видалення даних з пам'яті.
    */
   deleteFromMemory(key) {
     try {
       if (!this.memoryStorage.has(key)) {
-        throw new Error(`No data found in memory with key: ${key}`);
+        throw new Error(`No data found in memory with key: ${key}`); // Перевірка наявності даних
       }
-      this.memoryStorage.delete(key);
-      this.log(`Deleted JSON data from memory with key: ${key}`);
+      this.memoryStorage.delete(key); // Видаляє дані з пам'яті
+      this.log(`Deleted JSON data from memory with key: ${key}`); // Логування успішного видалення
     } catch (error) {
-      console.error(`Error deleting JSON data from memory: ${error.message}`);
-      throw error;
+      console.error(`Error deleting JSON data from memory: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
@@ -244,24 +267,25 @@ class FileSystem {
    */
   async createZipArchive(archivePath, files) {
     try {
-      const output = this.createWriteStream(archivePath);
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      const fullPath = this.resolvePath(archivePath); // Перетворює відносний шлях у абсолютний
+      const output = this.createWriteStream(fullPath); // Створює потік для запису архіву
+      const archive = archiver('zip', { zlib: { level: 9 } }); // Створює архіватор ZIP з максимальним рівнем стиснення
 
       output.on('close', () => {
-        this.log(`Created ZIP archive at: ${archivePath}`);
+        this.log(`Created ZIP archive at: ${fullPath}`); // Логування успішного створення архіву
       });
 
-      archive.pipe(output);
+      archive.pipe(output); // Проводить потік архіву до потоку виходу
 
       files.forEach(file => {
-        const fullPath = path.join(this.basePath, file);
-        archive.file(fullPath, { name: path.basename(file) });
+        const filePath = this.resolvePath(file); // Перетворює відносний шлях у абсолютний
+        archive.file(filePath, { name: path.basename(file) }); // Додає файл до архіву
       });
 
-      await archive.finalize();
+      await archive.finalize(); // Завершує архівацію
     } catch (error) {
-      console.error(`Error creating ZIP archive ${archivePath}: ${error.message}`);
-      throw error;
+      console.error(`Error creating ZIP archive ${archivePath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
   }
 
@@ -273,18 +297,30 @@ class FileSystem {
    */
   async extractZipArchive(archivePath, extractDir) {
     try {
-      await this.ensureDirectoryExists(extractDir);
-      this.log(`Extracting ZIP archive from: ${archivePath} to directory: ${extractDir}`);
+      const fullArchivePath = this.resolvePath(archivePath); // Перетворює відносний шлях у абсолютний
+      const fullExtractDir = this.resolvePath(extractDir); // Перетворює відносний шлях у абсолютний
+      await this.ensureDirectoryExists(fullExtractDir); // Переконується, що директорія існує
+      this.log(`Extracting ZIP archive from: ${fullArchivePath} to directory: ${fullExtractDir}`); // Логування початку розпаковування
 
-      await fsPromises.createReadStream(archivePath)
-        .pipe(unzipper.Extract({ path: extractDir }))
+      await fsPromises.createReadStream(fullArchivePath)
+        .pipe(unzipper.Extract({ path: fullExtractDir })) // Розпаковує архів у вказану директорію
         .promise();
 
-      this.log(`Extracted ZIP archive to directory: ${extractDir}`);
+      this.log(`Extracted ZIP archive to directory: ${fullExtractDir}`); // Логування успішного розпаковування
     } catch (error) {
-      console.error(`Error extracting ZIP archive ${archivePath}: ${error.message}`);
-      throw error;
+      console.error(`Error extracting ZIP archive ${archivePath}: ${error.message}`); // Логування помилки
+      throw error; // Перекидання помилки
     }
+  }
+
+  /**
+   * Вирішує шлях до файлу, перетворюючи відносні шляхи на абсолютні.
+   * @param {string} filePath - Відносний або абсолютний шлях до файлу.
+   * @returns {string} Абсолютний шлях до файлу.
+   */
+  resolvePath(filePath) {
+    // Перевіряє, чи шлях вже абсолютний, або перетворює відносний шлях у абсолютний
+    return path.isAbsolute(filePath) ? filePath : path.join(this.basePath, filePath);
   }
 }
 
