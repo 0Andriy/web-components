@@ -2,9 +2,9 @@ const regedit = require('regedit');
 const path = require('path');
 const assert = require('assert');
 
-/**
- * Клас для управління реєстром Windows.
- */
+// Встановлення регedit у режимі обіцянок
+regedit.promisify();
+
 class RegistryManager {
   /**
    * Конструктор класу RegistryManager.
@@ -32,12 +32,8 @@ class RegistryManager {
    */
   async readValue(key, value) {
     try {
-      return new Promise((resolve, reject) => {
-        regedit.list([key], (err, result) => {
-          if (err) return reject(err);
-          resolve(result[key] && result[key][value] ? result[key][value].value : null);
-        });
-      });
+      const result = await regedit.list([key]);
+      return result[key] && result[key][value] ? result[key][value].value : null;
     } catch (error) {
       console.error(`Error reading registry value from ${key}\\${value}: ${error.message}`);
       return null;
@@ -55,20 +51,15 @@ class RegistryManager {
   async writeValue(key, value, data, type = 'REG_SZ') {
     try {
       await this.ensureKey(key);
-      return new Promise((resolve, reject) => {
-        regedit.putValue({
-          [key]: {
-            [value]: {
-              value: data,
-              type: type
-            }
+      await regedit.putValue({
+        [key]: {
+          [value]: {
+            value: data,
+            type: type
           }
-        }, (err) => {
-          if (err) return reject(err);
-          this.log(`Value written to ${key}\\${value}`);
-          resolve();
-        });
+        }
       });
+      this.log(`Value written to ${key}\\${value}`);
     } catch (error) {
       console.error(`Error writing registry value to ${key}\\${value}: ${error.message}`);
     }
@@ -104,13 +95,8 @@ class RegistryManager {
    */
   async deleteValue(key, value) {
     try {
-      return new Promise((resolve, reject) => {
-        regedit.deleteValue({ [key]: [value] }, (err) => {
-          if (err) return reject(err);
-          this.log(`Value ${value} deleted from ${key}`);
-          resolve();
-        });
-      });
+      await regedit.deleteValue({ [key]: [value] });
+      this.log(`Value ${value} deleted from ${key}`);
     } catch (error) {
       console.error(`Error deleting registry value ${value} from ${key}: ${error.message}`);
     }
@@ -137,13 +123,8 @@ class RegistryManager {
    */
   async deleteKey(key) {
     try {
-      return new Promise((resolve, reject) => {
-        regedit.deleteKey([key], (err) => {
-          if (err) return reject(err);
-          this.log(`Registry key ${key} deleted`);
-          resolve();
-        });
-      });
+      await regedit.deleteKey([key]);
+      this.log(`Registry key ${key} deleted`);
     } catch (error) {
       console.error(`Error deleting registry key ${key}: ${error.message}`);
     }
@@ -156,12 +137,8 @@ class RegistryManager {
    */
   async keyExists(key) {
     try {
-      return new Promise((resolve, reject) => {
-        regedit.list([key], (err, result) => {
-          if (err) return reject(err);
-          resolve(result[key] !== undefined);
-        });
-      });
+      const result = await regedit.list([key]);
+      return result[key] !== undefined;
     } catch (error) {
       console.error(`Error checking existence of registry key ${key}: ${error.message}`);
       return false;
@@ -176,12 +153,8 @@ class RegistryManager {
    */
   async valueExists(key, value) {
     try {
-      return new Promise((resolve, reject) => {
-        regedit.list([key], (err, result) => {
-          if (err) return reject(err);
-          resolve(result[key] && result[key][value] !== undefined);
-        });
-      });
+      const result = await regedit.list([key]);
+      return result[key] && result[key][value] !== undefined;
     } catch (error) {
       console.error(`Error checking existence of registry value ${value} in ${key}: ${error.message}`);
       return false;
@@ -201,13 +174,8 @@ class RegistryManager {
       currentPath = path.join(currentPath, key);
       const exists = await this.keyExists(currentPath);
       if (!exists) {
-        await new Promise((resolve, reject) => {
-          regedit.putValue({ [currentPath]: {} }, (err) => {
-            if (err) return reject(err);
-            this.log(`Registry key ${currentPath} created`);
-            resolve();
-          });
-        });
+        await regedit.putValue({ [currentPath]: {} });
+        this.log(`Registry key ${currentPath} created`);
       }
     }
   }
