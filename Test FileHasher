@@ -3,208 +3,209 @@ const path = require('path');
 const crypto = require('crypto');
 
 class FileHasher {
-  /**
-   * Конструктор класу FileHasher.
-   * @param {string} algorithm - Алгоритм хешування (за замовчуванням 'sha256').
-   * @param {boolean} enableLogging - Чи ввімкнути логування (за замовчуванням true).
-   * @param {object} logger - Логгер для виведення повідомлень (за замовчуванням console).
-   */
-  constructor(algorithm = 'sha256', enableLogging = true, logger = console) {
-    this.algorithm = algorithm;
-    this.enableLogging = enableLogging;
-    this.logger = logger;
-    this.fileCache = new Map();
-    this.dirCache = new Map();
-  }
-
-  /**
-   * Логування повідомлень, якщо увімкнене.
-   * @param {string} message - Повідомлення для логування.
-   */
-  log(message) {
-    if (this.enableLogging) {
-      this.logger.log(message);
-    }
-  }
-
-  /**
-   * Асинхронне хешування файлу.
-   * @param {string} filePath - Шлях до файлу.
-   * @returns {Promise<string>} - Хеш файлу.
-   */
-  async hashFile(filePath) {
-    this.log(`Hashing file: ${filePath}`);
-    
-    const cacheEntry = this.fileCache.get(filePath);
-    if (cacheEntry) {
-      const { hash, mtime, size } = cacheEntry;
-      const stat = await fs.promises.stat(filePath);
-      if (stat.mtimeMs === mtime && stat.size === size) {
-        this.log(`Cache hit for file: ${filePath}`);
-        return hash;
-      }
+    /**
+     * Конструктор класу FileHasher.
+     * @param {string} algorithm - Алгоритм хешування (за замовчуванням 'sha256').
+     * @param {boolean} enableLogging - Чи ввімкнути логування (за замовчуванням true).
+     * @param {object} logger - Логгер для виведення повідомлень (за замовчуванням console).
+     */
+    constructor(algorithm = 'sha256', enableLogging = true, logger = console) {
+        this.algorithm = algorithm;
+        this.enableLogging = enableLogging;
+        this.logger = logger;
+        this.fileCache = new Map();
+        this.dirCache = new Map();
     }
 
-    return new Promise((resolve, reject) => {
-      const hash = crypto.createHash(this.algorithm);
-      const input = fs.createReadStream(filePath);
-
-      input.on('data', chunk => hash.update(chunk));
-      input.on('end', async () => {
-        const fileHash = hash.digest('hex');
-        const stat = await fs.promises.stat(filePath);
-        this.fileCache.set(filePath, { hash: fileHash, mtime: stat.mtimeMs, size: stat.size });
-        resolve(fileHash);
-      });
-      input.on('error', reject);
-    });
-  }
-
-  /**
-   * Асинхронне хешування всіх файлів у директорії.
-   * @param {string} dirPath - Шлях до директорії.
-   * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли.
-   */
-  async hashFilesInDirectory(dirPath) {
-    this.log(`Hashing files in directory: ${dirPath}`);
-    
-    const files = await fs.promises.readdir(dirPath);
-    const fileInfos = [];
-
-    for (const file of files) {
-      const filePath = path.join(dirPath, file);
-      const stat = await fs.promises.stat(filePath);
-      if (stat.isFile()) {
-        const fileHash = await this.hashFile(filePath);
-        fileInfos.push({
-          type: 'file',
-          name: file,
-          hash: fileHash,
-          path: path.relative(process.cwd(), filePath) // Відносний шлях
-        });
-      }
-    }
-
-    return fileInfos;
-  }
-
-  /**
-   * Асинхронне рекурсивне читання директорії з можливістю включення хешів для піддиректорій.
-   * @param {string} currentPath - Поточний шлях директорії.
-   * @param {string} relativePath - Відносний шлях директорії.
-   * @param {boolean} includeDirectories - Включати чи ні хеші для директорій.
-   * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли та директорії.
-   */
-  async readDirectory(currentPath, relativePath = '', includeDirectories = false) {
-    const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
-    const results = [];
-
-    for (const entry of entries) {
-      const fullPath = path.join(currentPath, entry.name);
-      const relativeFullPath = path.join(relativePath, entry.name);
-
-      if (entry.isFile()) {
-        const fileHash = await this.hashFile(fullPath);
-        results.push({
-          type: 'file',
-          name: entry.name,
-          hash: fileHash,
-          path: relativeFullPath
-        });
-      } else if (entry.isDirectory()) {
-        if (includeDirectories) {
-          const dirHash = await this.hashDirectory(fullPath, includeDirectories);
-          results.push({
-            type: 'directory',
-            name: entry.name,
-            hash: dirHash.hash,
-            path: relativeFullPath
-          });
-        } else {
-          results.push({
-            type: 'directory',
-            name: entry.name,
-            path: relativeFullPath
-          });
+    /**
+     * Логування повідомлень, якщо увімкнене.
+     * @param {string} message - Повідомлення для логування.
+     */
+    log(message) {
+        if (this.enableLogging) {
+            this.logger.log(message);
         }
-        const subEntries = await this.readDirectory(fullPath, relativeFullPath, includeDirectories);
-        results.push(...subEntries);
-      }
     }
 
-    return results;
-  }
+    /**
+     * Асинхронне хешування файлу.
+     * @param {string} filePath - Шлях до файлу.
+     * @returns {Promise<string>} - Хеш файлу.
+     */
+    async hashFile(filePath) {
+        this.log(`Hashing file: ${filePath}`);
 
-  /**
-   * Асинхронне рекурсивне хешування директорії з опцією включення хешів для піддиректорій.
-   * @param {string} dirPath - Шлях до директорії.
-   * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій.
-   * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли та директорії.
-   */
-  async hashDirectoryRecursively(dirPath, includeDirectories = false) {
-    this.log(`Hashing directory recursively: ${dirPath}`);
-    return this.readDirectory(dirPath, '', includeDirectories);
-  }
+        const cacheEntry = this.fileCache.get(filePath);
+        if (cacheEntry) {
+            const { hash, mtime, size } = cacheEntry;
+            const stat = await fs.promises.stat(filePath);
+            if (stat.mtimeMs === mtime && stat.size === size) {
+                this.log(`Cache hit for file: ${filePath}`);
+                return hash;
+            }
+        }
 
-  /**
-   * Хешування директорії на основі її вмісту.
-   * @param {string} dirPath - Шлях до директорії.
-   * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій.
-   * @returns {Promise<Object>} - Об'єкт з хешем директорії та інформацією про її вміст.
-   */
-  async hashDirectory(dirPath, includeDirectories = false) {
-    this.log(`Hashing directory: ${dirPath}`);
+        return new Promise((resolve, reject) => {
+            const hash = crypto.createHash(this.algorithm);
+            const input = fs.createReadStream(filePath);
 
-    const cacheEntry = this.dirCache.get(dirPath);
-    if (cacheEntry) {
-      const { hash, mtime } = cacheEntry;
-      const stat = await fs.promises.stat(dirPath);
-      if (stat.mtimeMs === mtime) {
-        this.log(`Cache hit for directory: ${dirPath}`);
-        return { hash, contents: cacheEntry.contents };
-      }
+            input.on('data', chunk => hash.update(chunk));
+            input.on('end', async () => {
+                const fileHash = hash.digest('hex');
+                const stat = await fs.promises.stat(filePath);
+                this.fileCache.set(filePath, { hash: fileHash, mtime: stat.mtimeMs, size: stat.size });
+                resolve(fileHash);
+            });
+            input.on('error', reject);
+        });
     }
 
-    const fileInfos = await this.hashFilesInDirectory(dirPath);
-    const hash = crypto.createHash(this.algorithm);
-    fileInfos.sort((a, b) => a.path.localeCompare(b.path));
-    fileInfos.forEach(info => hash.update(info.hash));
+    /**
+     * Асинхронне хешування всіх файлів у директорії.
+     * @param {string} dirPath - Шлях до директорії.
+     * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли.
+     */
+    async hashFilesInDirectory(dirPath) {
+        this.log(`Hashing files in directory: ${dirPath}`);
 
-    const dirHash = hash.digest('hex');
-    const stat = await fs.promises.stat(dirPath);
-    this.dirCache.set(dirPath, { hash: dirHash, mtime: stat.mtimeMs, contents: fileInfos });
+        const files = await fs.promises.readdir(dirPath);
+        const fileInfos = [];
 
-    return {
-      hash: dirHash,
-      contents: fileInfos
-    };
-  }
+        for (const file of files) {
+            const filePath = path.join(dirPath, file);
+            const stat = await fs.promises.stat(filePath);
+            if (stat.isFile()) {
+            const fileHash = await this.hashFile(filePath);
+            fileInfos.push({
+                type: 'file',
+                name: file,
+                hash: fileHash,
+                path: path.relative(process.cwd(), filePath) // Відносний шлях
+            });
+            }
+        }
+
+        return fileInfos;
+    }
+
+    /**
+     * Хешування директорії на основі її вмісту.
+     * @param {string} dirPath - Шлях до директорії.
+     * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій.
+     * @returns {Promise<Object>} - Об'єкт з хешем директорії та інформацією про її вміст.
+     */
+    async hashDirectory(dirPath, includeDirectories = false) {
+        this.log(`Hashing directory: ${dirPath}`);
+
+        const cacheEntry = this.dirCache.get(dirPath);
+        if (cacheEntry) {
+            const { hash, mtime } = cacheEntry;
+            const stat = await fs.promises.stat(dirPath);
+            if (stat.mtimeMs === mtime) {
+            this.log(`Cache hit for directory: ${dirPath}`);
+            return { hash, contents: cacheEntry.contents };
+            }
+        }
+
+        const fileInfos = await this.hashFilesInDirectory(dirPath);
+        const hash = crypto.createHash(this.algorithm);
+        fileInfos.sort((a, b) => a.path.localeCompare(b.path));
+        fileInfos.forEach(info => hash.update(info.hash));
+
+        const dirHash = hash.digest('hex');
+        const stat = await fs.promises.stat(dirPath);
+        this.dirCache.set(dirPath, { hash: dirHash, mtime: stat.mtimeMs, contents: fileInfos });
+
+        return {
+            hash: dirHash,
+            contents: fileInfos
+        };
+    }
+
+
+    /**
+     * Асинхронне рекурсивне читання директорії з можливістю включення хешів для піддиректорій.
+     * @param {string} currentPath - Поточний шлях директорії.
+     * @param {string} relativePath - Відносний шлях директорії.
+     * @param {boolean} includeDirectories - Включати чи ні хеші для директорій.
+     * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли та директорії.
+     */
+    async readDirectory(currentPath, relativePath = '', includeDirectories = false) {
+        const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
+        const results = [];
+
+        for (const entry of entries) {
+            const fullPath = path.join(currentPath, entry.name);
+            const relativeFullPath = path.join(relativePath, entry.name);
+
+            if (entry.isFile()) {
+                const fileHash = await this.hashFile(fullPath);
+                results.push({
+                    type: 'file',
+                    name: entry.name,
+                    hash: fileHash,
+                    path: relativeFullPath
+                });
+            } else if (entry.isDirectory()) {
+                if (includeDirectories) {
+                    const dirHash = await this.hashDirectory(fullPath, includeDirectories);
+
+                    results.push({
+                    type: 'directory',
+                    name: entry.name,
+                    hash: dirHash.hash,
+                    path: relativeFullPath
+                    });
+                }
+                
+                const subEntries = await this.readDirectory(fullPath, relativeFullPath, includeDirectories);
+                results.push(...subEntries);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Асинхронне рекурсивне хешування директорії з опцією включення хешів для піддиректорій.
+     * @param {string} dirPath - Шлях до директорії.
+     * @param {boolean} includeDirectories - Включати чи ні хеші для піддиректорій.
+     * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли та директорії.
+     */
+    async hashDirectoryRecursively(dirPath, includeDirectories = false) {
+        this.log(`Hashing directory recursively: ${dirPath}`);
+        return this.readDirectory(dirPath, '', includeDirectories);
+    }
+
+
 }
 
 // Приклад використання
 (async () => {
-  const hasher = new FileHasher('sha256', true, console);
+    const hasher = new FileHasher('sha256', true, console);
 
-  try {
-    const fileHash = await hasher.hashFile('project/folder/file1.txt');
-    console.log('File hash:', fileHash);
+    try {
+        const fileHash = await hasher.hashFile('project/folder/file1.txt');
+        console.log('File hash:', fileHash);
 
-    const folderInfos = await hasher.hashFilesInDirectory('project/folder');
-    console.log('Folder file infos:', folderInfos);
+        const folderInfos = await hasher.hashFilesInDirectory('project/folder');
+        console.log('Folder file infos:', folderInfos);
 
-    const recursiveInfos = await hasher.hashDirectoryRecursively('project/folder', true);
-    console.log('Recursive folder infos with directory hashes:', recursiveInfos);
+        const recursiveInfos = await hasher.hashDirectoryRecursively('project/folder', true);
+        console.log('Recursive folder infos with directory hashes:', recursiveInfos);
 
-    const recursiveInfosNoDirHash = await hasher.hashDirectoryRecursively('project/folder', false);
-    console.log('Recursive folder infos without directory hashes:', recursiveInfosNoDirHash);
+        const recursiveInfosNoDirHash = await hasher.hashDirectoryRecursively('project/folder', false);
+        console.log('Recursive folder infos without directory hashes:', recursiveInfosNoDirHash);
 
-    const directoryInfoWithHashes = await hasher.hashDirectory('project/folder', true);
-    console.log('Directory hash and contents with directory hashes:', directoryInfoWithHashes);
+        const directoryInfoWithHashes = await hasher.hashDirectory('project/folder', true);
+        console.log('Directory hash and contents with directory hashes:', directoryInfoWithHashes);
 
-    const directoryInfoWithoutHashes = await hasher.hashDirectory('project/folder', false);
-    console.log('Directory hash and contents without directory hashes:', directoryInfoWithoutHashes);
+        const directoryInfoWithoutHashes = await hasher.hashDirectory('project/folder', false);
+        console.log('Directory hash and contents without directory hashes:', directoryInfoWithoutHashes);
 
-  } catch (error) {
-    console.error('Error:', error.message);
-  }
-})();
+    } catch (error) {
+        console.error('Error:', error.message);
+    }
+})
+// Запуск
+();
