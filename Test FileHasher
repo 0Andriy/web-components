@@ -35,29 +35,34 @@ class FileHasher {
     async hashFile(filePath) {
         this.log(`Hashing file: ${filePath}`);
 
-        const cacheEntry = this.fileCache.get(filePath);
-        if (cacheEntry) {
-            const { hash, mtime, size } = cacheEntry;
-            const stat = await fs.promises.stat(filePath);
-            if (stat.mtimeMs === mtime && stat.size === size) {
-                this.log(`Cache hit for file: ${filePath}`);
-                return hash;
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            const hash = crypto.createHash(this.algorithm);
-            const input = fs.createReadStream(filePath);
-
-            input.on('data', chunk => hash.update(chunk));
-            input.on('end', async () => {
-                const fileHash = hash.digest('hex');
+        try {
+            const cacheEntry = this.fileCache.get(filePath);
+            if (cacheEntry) {
+                const { hash, mtime, size } = cacheEntry;
                 const stat = await fs.promises.stat(filePath);
-                this.fileCache.set(filePath, { hash: fileHash, mtime: stat.mtimeMs, size: stat.size });
-                resolve(fileHash);
+                if (stat.mtimeMs === mtime && stat.size === size) {
+                    this.log(`Cache hit for file: ${filePath}`);
+                    return hash;
+                }
+            }
+
+            return new Promise((resolve, reject) => {
+                const hash = crypto.createHash(this.algorithm);
+                const input = fs.createReadStream(filePath);
+
+                input.on('data', chunk => hash.update(chunk));
+                input.on('end', async () => {
+                    const fileHash = hash.digest('hex');
+                    const stat = await fs.promises.stat(filePath);
+                    this.fileCache.set(filePath, { hash: fileHash, mtime: stat.mtimeMs, size: stat.size });
+                    resolve(fileHash);
+                });
+                input.on('error', reject);
             });
-            input.on('error', reject);
-        });
+        } catch (error) {
+            this.log(`Error hashing file: ${error.message}`);
+            throw error;
+        }
     }
 
     /**
@@ -68,24 +73,27 @@ class FileHasher {
     async hashFilesInDirectory(dirPath) {
         this.log(`Hashing files in directory: ${dirPath}`);
 
-        const files = await fs.promises.readdir(dirPath);
-        const fileInfos = [];
+        try {
+            const files = await fs.promises.readdir(dirPath);
+            const fileInfos = await Promise.all(files.map(async (file) => {
+                const filePath = path.join(dirPath, file);
+                const stat = await fs.promises.stat(filePath);
+                if (stat.isFile()) {
+                    const fileHash = await this.hashFile(filePath);
+                    return {
+                        type: 'file',
+                        name: file,
+                        hash: fileHash,
+                        path: path.relative(process.cwd(), filePath) // Відносний шлях
+                    };
+                }
+            }));
 
-        for (const file of files) {
-            const filePath = path.join(dirPath, file);
-            const stat = await fs.promises.stat(filePath);
-            if (stat.isFile()) {
-            const fileHash = await this.hashFile(filePath);
-            fileInfos.push({
-                type: 'file',
-                name: file,
-                hash: fileHash,
-                path: path.relative(process.cwd(), filePath) // Відносний шлях
-            });
-            }
+            return fileInfos.filter(info => info); // Remove undefined entries
+        } catch (error) {
+            this.log(`Error hashing files in directory: ${error.message}`);
+            throw error;
         }
-
-        return fileInfos;
     }
 
     /**
@@ -97,31 +105,53 @@ class FileHasher {
     async hashDirectory(dirPath, includeDirectories = false) {
         this.log(`Hashing directory: ${dirPath}`);
 
-        const cacheEntry = this.dirCache.get(dirPath);
-        if (cacheEntry) {
-            const { hash, mtime } = cacheEntry;
-            const stat = await fs.promises.stat(dirPath);
-            if (stat.mtimeMs === mtime) {
-            this.log(`Cache hit for directory: ${dirPath}`);
-            return { hash, contents: cacheEntry.contents };
+        try {
+            const cacheEntry = this.dirCache.get(dirPath);
+            if (cacheEntry) {
+                const { hash, mtime } = cacheEntry;
+                const stat = await fs.promises.stat(dirPath);
+                if (stat.mtimeMs === mtime) {
+                    this.log(`Cache hit for directory: ${dirPath}`);
+                    return { hash, contents: cacheEntry.contents };
+                }
             }
+
+            const fileInfos = await this.hashFilesInDirectory(dirPath);
+            const hash = crypto.createHash(this.algorithm);
+            fileInfos.sort((a, b) => a.path.localeCompare(b.path));
+            fileInfos.forEach(info => hash.update(info.hash));
+
+            if (includeDirectories) {
+                // Include subdirectories
+                const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dirPath, entry.name);
+                    if (entry.isDirectory()) {
+                        const dirHash = await this.hashDirectory(fullPath, includeDirectories);
+                        fileInfos.push({
+                            type: 'directory',
+                            name: entry.name,
+                            hash: dirHash.hash,
+                            path: path.relative(process.cwd(), fullPath)
+                        });
+                        hash.update(dirHash.hash);
+                    }
+                }
+            }
+
+            const dirHash = hash.digest('hex');
+            const stat = await fs.promises.stat(dirPath);
+            this.dirCache.set(dirPath, { hash: dirHash, mtime: stat.mtimeMs, contents: fileInfos });
+
+            return {
+                hash: dirHash,
+                contents: fileInfos
+            };
+        } catch (error) {
+            this.log(`Error hashing directory: ${error.message}`);
+            throw error;
         }
-
-        const fileInfos = await this.hashFilesInDirectory(dirPath);
-        const hash = crypto.createHash(this.algorithm);
-        fileInfos.sort((a, b) => a.path.localeCompare(b.path));
-        fileInfos.forEach(info => hash.update(info.hash));
-
-        const dirHash = hash.digest('hex');
-        const stat = await fs.promises.stat(dirPath);
-        this.dirCache.set(dirPath, { hash: dirHash, mtime: stat.mtimeMs, contents: fileInfos });
-
-        return {
-            hash: dirHash,
-            contents: fileInfos
-        };
     }
-
 
     /**
      * Асинхронне рекурсивне читання директорії з можливістю включення хешів для піддиректорій.
@@ -131,39 +161,44 @@ class FileHasher {
      * @returns {Promise<Array>} - Масив об'єктів з інформацією про файли та директорії.
      */
     async readDirectory(currentPath, relativePath = '', includeDirectories = false) {
-        const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
-        const results = [];
+        try {
+            const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
+            const results = [];
 
-        for (const entry of entries) {
-            const fullPath = path.join(currentPath, entry.name);
-            const relativeFullPath = path.join(relativePath, entry.name);
+            for (const entry of entries) {
+                const fullPath = path.join(currentPath, entry.name);
+                const relativeFullPath = path.join(relativePath, entry.name);
 
-            if (entry.isFile()) {
-                const fileHash = await this.hashFile(fullPath);
-                results.push({
-                    type: 'file',
-                    name: entry.name,
-                    hash: fileHash,
-                    path: relativeFullPath
-                });
-            } else if (entry.isDirectory()) {
-                if (includeDirectories) {
-                    const dirHash = await this.hashDirectory(fullPath, includeDirectories);
-
+                if (entry.isFile()) {
+                    const fileHash = await this.hashFile(fullPath);
                     results.push({
-                    type: 'directory',
-                    name: entry.name,
-                    hash: dirHash.hash,
-                    path: relativeFullPath
+                        type: 'file',
+                        name: entry.name,
+                        hash: fileHash,
+                        path: relativeFullPath
                     });
-                }
-                
-                const subEntries = await this.readDirectory(fullPath, relativeFullPath, includeDirectories);
-                results.push(...subEntries);
-            }
-        }
+                } else if (entry.isDirectory()) {
+                    if (includeDirectories) {
+                        const dirHash = await this.hashDirectory(fullPath, includeDirectories);
 
-        return results;
+                        results.push({
+                            type: 'directory',
+                            name: entry.name,
+                            hash: dirHash.hash,
+                            path: relativeFullPath
+                        });
+                    }
+
+                    const subEntries = await this.readDirectory(fullPath, relativeFullPath, includeDirectories);
+                    results.push(...subEntries);
+                }
+            }
+
+            return results;
+        } catch (error) {
+            this.log(`Error reading directory: ${error.message}`);
+            throw error;
+        }
     }
 
     /**
@@ -174,10 +209,13 @@ class FileHasher {
      */
     async hashDirectoryRecursively(dirPath, includeDirectories = false) {
         this.log(`Hashing directory recursively: ${dirPath}`);
-        return this.readDirectory(dirPath, '', includeDirectories);
+        try {
+            return await this.readDirectory(dirPath, '', includeDirectories);
+        } catch (error) {
+            this.log(`Error hashing directory recursively: ${error.message}`);
+            throw error;
+        }
     }
-
-
 }
 
 // Приклад використання
@@ -206,6 +244,4 @@ class FileHasher {
     } catch (error) {
         console.error('Error:', error.message);
     }
-})
-// Запуск
-();
+})();
