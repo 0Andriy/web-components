@@ -3,22 +3,20 @@ const path = require('path');
 const assert = require('assert');
 
 /**
- * Клас для роботи з реєстром Windows.
- * Містить методи для читання, запису, видалення значень та створення/видалення ключів.
+ * Клас для управління реєстром Windows.
  */
 class RegistryManager {
   /**
-   * Конструктор класу RegistryManager
-   * @param {boolean} logEnabled - Вказує, чи потрібно включити логування (за замовчуванням false)
+   * Конструктор класу RegistryManager.
+   * @param {boolean} logEnabled - Увімкнути логування.
    */
   constructor(logEnabled = false) {
-    regedit.setPromiseMode(); // Встановлення режиму обробки обіцянок для regedit
-    this.logEnabled = logEnabled; // Включення або виключення логування
+    this.logEnabled = logEnabled;
   }
 
   /**
-   * Вивід логів, якщо логування увімкнено
-   * @param {string} message - Повідомлення для виводу в консоль
+   * Логування повідомлень, якщо увімкнено.
+   * @param {string} message - Повідомлення для логування.
    */
   log(message) {
     if (this.logEnabled) {
@@ -27,15 +25,19 @@ class RegistryManager {
   }
 
   /**
-   * Читання значення з реєстру
-   * @param {string} key - Шлях до ключа реєстру
-   * @param {string} value - Ім'я значення
-   * @returns {Promise<any>} - Значення або null, якщо ключ/значення не існує
+   * Читання значення з реєстру.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @param {string} value - Ім'я значення.
+   * @returns {Promise<any>} - Значення з реєстру або null, якщо значення не знайдено.
    */
   async readValue(key, value) {
     try {
-      const result = await regedit.list([key]);
-      return result[key] && result[key][value] ? result[key][value].value : null;
+      return new Promise((resolve, reject) => {
+        regedit.list([key], (err, result) => {
+          if (err) return reject(err);
+          resolve(result[key] && result[key][value] ? result[key][value].value : null);
+        });
+      });
     } catch (error) {
       console.error(`Error reading registry value from ${key}\\${value}: ${error.message}`);
       return null;
@@ -43,35 +45,42 @@ class RegistryManager {
   }
 
   /**
-   * Запис значення в реєстр
-   * @param {string} key - Шлях до ключа реєстру
-   * @param {string} value - Ім'я значення
-   * @param {any} data - Дані для запису
-   * @param {string} [type='REG_SZ'] - Тип даних (за замовчуванням REG_SZ)
+   * Запис значення в реєстр.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @param {string} value - Ім'я значення.
+   * @param {any} data - Дані для запису.
+   * @param {string} [type='REG_SZ'] - Тип значення.
+   * @returns {Promise<void>}
    */
   async writeValue(key, value, data, type = 'REG_SZ') {
     try {
-      await this.ensureKey(key); // Переконатися, що ключ існує
-      await regedit.putValue({
-        [key]: {
-          [value]: {
-            value: data,
-            type: type
+      await this.ensureKey(key);
+      return new Promise((resolve, reject) => {
+        regedit.putValue({
+          [key]: {
+            [value]: {
+              value: data,
+              type: type
+            }
           }
-        }
+        }, (err) => {
+          if (err) return reject(err);
+          this.log(`Value written to ${key}\\${value}`);
+          resolve();
+        });
       });
-      this.log(`Value written to ${key}\\${value}`);
     } catch (error) {
       console.error(`Error writing registry value to ${key}\\${value}: ${error.message}`);
     }
   }
 
   /**
-   * Переконатися, що значення існує, і при необхідності створити його
-   * @param {string} key - Шлях до ключа реєстру
-   * @param {string} value - Ім'я значення
-   * @param {any} defaultData - Значення за замовчуванням, якщо значення не існує
-   * @param {string} [type='REG_SZ'] - Тип даних (за замовчуванням REG_SZ)
+   * Переконатися, що значення існує, і при необхідності створити його з даними за замовчуванням.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @param {string} value - Ім'я значення.
+   * @param {any} defaultData - Дані за замовчуванням для створення.
+   * @param {string} [type='REG_SZ'] - Тип значення.
+   * @returns {Promise<void>}
    */
   async ensureValue(key, value, defaultData, type = 'REG_SZ') {
     try {
@@ -88,22 +97,29 @@ class RegistryManager {
   }
 
   /**
-   * Видалення значення з реєстру
-   * @param {string} key - Шлях до ключа реєстру
-   * @param {string} value - Ім'я значення
+   * Видалення значення з реєстру.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @param {string} value - Ім'я значення.
+   * @returns {Promise<void>}
    */
   async deleteValue(key, value) {
     try {
-      await regedit.deleteValue({ [key]: [value] });
-      this.log(`Value ${value} deleted from ${key}`);
+      return new Promise((resolve, reject) => {
+        regedit.deleteValue({ [key]: [value] }, (err) => {
+          if (err) return reject(err);
+          this.log(`Value ${value} deleted from ${key}`);
+          resolve();
+        });
+      });
     } catch (error) {
       console.error(`Error deleting registry value ${value} from ${key}: ${error.message}`);
     }
   }
 
   /**
-   * Створення ключа реєстру
-   * @param {string} key - Шлях до ключа реєстру
+   * Створення ключа реєстру, включаючи проміжні ключі.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @returns {Promise<void>}
    */
   async createKey(key) {
     try {
@@ -115,27 +131,37 @@ class RegistryManager {
   }
 
   /**
-   * Видалення ключа реєстру
-   * @param {string} key - Шлях до ключа реєстру
+   * Видалення ключа реєстру.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @returns {Promise<void>}
    */
   async deleteKey(key) {
     try {
-      await regedit.deleteKey([key]);
-      this.log(`Registry key ${key} deleted`);
+      return new Promise((resolve, reject) => {
+        regedit.deleteKey([key], (err) => {
+          if (err) return reject(err);
+          this.log(`Registry key ${key} deleted`);
+          resolve();
+        });
+      });
     } catch (error) {
       console.error(`Error deleting registry key ${key}: ${error.message}`);
     }
   }
 
   /**
-   * Перевірка існування ключа реєстру
-   * @param {string} key - Шлях до ключа реєстру
-   * @returns {Promise<boolean>} - true, якщо ключ існує, false в іншому випадку
+   * Перевірка існування ключа реєстру.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @returns {Promise<boolean>} - true, якщо ключ існує, інакше false.
    */
   async keyExists(key) {
     try {
-      const result = await regedit.list([key]);
-      return result[key] !== undefined;
+      return new Promise((resolve, reject) => {
+        regedit.list([key], (err, result) => {
+          if (err) return reject(err);
+          resolve(result[key] !== undefined);
+        });
+      });
     } catch (error) {
       console.error(`Error checking existence of registry key ${key}: ${error.message}`);
       return false;
@@ -143,15 +169,19 @@ class RegistryManager {
   }
 
   /**
-   * Перевірка існування значення в ключі реєстру
-   * @param {string} key - Шлях до ключа реєстру
-   * @param {string} value - Ім'я значення
-   * @returns {Promise<boolean>} - true, якщо значення існує, false в іншому випадку
+   * Перевірка існування значення у ключі реєстру.
+   * @param {string} key - Шлях до ключа реєстру.
+   * @param {string} value - Ім'я значення.
+   * @returns {Promise<boolean>} - true, якщо значення існує, інакше false.
    */
   async valueExists(key, value) {
     try {
-      const result = await regedit.list([key]);
-      return result[key] && result[key][value] !== undefined;
+      return new Promise((resolve, reject) => {
+        regedit.list([key], (err, result) => {
+          if (err) return reject(err);
+          resolve(result[key] && result[key][value] !== undefined);
+        });
+      });
     } catch (error) {
       console.error(`Error checking existence of registry value ${value} in ${key}: ${error.message}`);
       return false;
@@ -159,8 +189,9 @@ class RegistryManager {
   }
 
   /**
-   * Переконатися, що всі проміжні ключі існують
-   * @param {string} fullKeyPath - Повний шлях до ключа реєстру
+   * Переконатися, що ключ існує, створити всі проміжні ключі, якщо їх не існує.
+   * @param {string} fullKeyPath - Повний шлях до ключа реєстру.
+   * @returns {Promise<void>}
    */
   async ensureKey(fullKeyPath) {
     const keys = fullKeyPath.split('\\').filter(part => part.trim() !== '');
@@ -170,14 +201,19 @@ class RegistryManager {
       currentPath = path.join(currentPath, key);
       const exists = await this.keyExists(currentPath);
       if (!exists) {
-        await regedit.putValue({ [currentPath]: {} }); // Створити ключ без значень
-        this.log(`Registry key ${currentPath} created`);
+        await new Promise((resolve, reject) => {
+          regedit.putValue({ [currentPath]: {} }, (err) => {
+            if (err) return reject(err);
+            this.log(`Registry key ${currentPath} created`);
+            resolve();
+          });
+        });
       }
     }
   }
 }
 
-// Тестування класу RegistryManager
+// Тестові приклади
 (async function() {
   const registry = new RegistryManager(true); // Увімкнути логування
   const testKey = 'HKEY_CURRENT_USER\\Software\\MyApp\\Settings';
